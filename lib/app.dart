@@ -27,7 +27,8 @@ class App extends StatelessComponent {
         Route(path: '/', title: 'Home', builder: (context, state) => const Home()),
         Route(path: '/about', title: 'About', builder: (context, state) => const About()),
         // Dynamically register routes for all compiled Markdown blog posts (excluding 'about')!
-        for (final post in mockPosts.where((p) => p.id != 'about'))
+        // Drafts are viewable by URL while serving locally, but are left out of production builds.
+        for (final post in mockPosts.where((p) => p.id != 'about' && (kDebugMode || !p.draft)))
           Route(
             path: '/post/${post.id}',
             title: post.title,

@@ -1,0 +1,22 @@
+name: Validate PR
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Only validate the latest commit of each PR.
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-site

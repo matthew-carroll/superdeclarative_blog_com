@@ -1,0 +1,30 @@
+name: Build site
+description: Builds the static site into build/jaspr. Shared by PR validation and deployment, so that PRs run the same build that gets deployed.
+
+runs:
+  using: composite
+  steps:
+    # Jaspr 0.23's build packages don't support Dart 3.14 yet.
+    - uses: dart-lang/setup-dart@v1
+      with:
+        sdk: "3.13"
+
+    # Fail, rather than silently upgrade, if pubspec.lock is out of date.
+    - name: Install dependencies
+      shell: bash
+      run: dart pub get --enforce-lockfile
+
+    # Keep this version in sync with the jaspr version in pubspec.lock.
+    - name: Install Jaspr CLI
+      shell: bash
+      run: dart pub global activate jaspr_cli 0.23.4
+
+    # Posts must be compiled before the build starts. Otherwise, the build uses
+    # whatever version of posts_generated.dart was committed.
+    - name: Compile posts
+      shell: bash
+      run: dart run bin/compile_posts.dart
+
+    - name: Build static site
+      shell: bash
+      run: dart pub global run jaspr_cli:jaspr build
