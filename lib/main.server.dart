@@ -61,7 +61,7 @@ void main() {
       link(rel: 'shortcut icon', href: '/images/favicon/favicon.ico'),
       meta(name: 'msapplication-TileColor', content: '#07080D'),
       meta(name: 'msapplication-config', content: '/images/favicon/browserconfig.xml'),
-      meta(name: 'theme-color', content: '#07080D'),
+      meta(name: 'theme-color', content: '#FAF9F6'),
       link(
         rel: 'preconnect',
         href: 'https://fonts.googleapis.com',
@@ -79,10 +79,26 @@ void main() {
       script(
         content: '''
 (function() {
-  function applyTheme(theme) {
+  // The visitor chooses light, dark or system, and system is the default. System
+  // falls back to light when there isn't a system preference.
+  var systemDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var choice = null;
+  try { choice = localStorage.getItem('sd-theme'); } catch (e) {}
+  if (choice !== 'light' && choice !== 'dark') choice = 'system';
+
+  function resolveTheme() {
+    if (choice !== 'system') return choice;
+    return systemDark && systemDark.matches ? 'dark' : 'light';
+  }
+  function syncToggle() {
+    var input = document.querySelector('#theme-toggle input[value="' + choice + '"]');
+    if (input) input.checked = true;
+  }
+  function applyTheme() {
     var root = document.documentElement;
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (theme === 'light') {
+    root.setAttribute('data-theme-choice', choice);
+    if (resolveTheme() === 'light') {
       root.setAttribute('data-theme', 'light');
       if (meta) meta.setAttribute('content', '#FAF9F6');
     } else {
@@ -90,24 +106,62 @@ void main() {
       if (meta) meta.setAttribute('content', '#141416');
     }
   }
-  try {
-    if (localStorage.getItem('sd-theme') === 'light') {
-      applyTheme('light');
-    }
-  } catch (e) {}
-  document.addEventListener('click', function(e) {
-    var btn = e.target && e.target.closest ? e.target.closest('#theme-toggle') : null;
-    if (!btn) return;
-    var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-    try { localStorage.setItem('sd-theme', next); } catch (err) {}
 
-    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!document.startViewTransition || reduceMotion) {
-      applyTheme(next);
+  applyTheme();
+  document.addEventListener('DOMContentLoaded', syncToggle);
+
+  // Follow changes to the system preference.
+  if (systemDark && systemDark.addEventListener) {
+    systemDark.addEventListener('change', applyTheme);
+  }
+
+  // While a theme change is animating, the browser sends every click to the root
+  // element. Find the option that was clicked, so that the toggle still responds.
+  document.addEventListener('click', function(e) {
+    if (e.target !== document.documentElement) return;
+    document.querySelectorAll('.theme-option').forEach(function(option) {
+      var rect = option.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX < rect.right && e.clientY >= rect.top && e.clientY < rect.bottom) {
+        option.querySelector('input').click();
+      }
+    });
+  });
+
+  var transition = null;
+  var reveal = null;
+
+  document.addEventListener('change', function(e) {
+    var option = e.target && e.target.closest ? e.target.closest('.theme-option') : null;
+    if (!option) return;
+    var previousTheme = resolveTheme();
+    choice = e.target.value;
+    try {
+      if (choice === 'system') localStorage.removeItem('sd-theme');
+      else localStorage.setItem('sd-theme', choice);
+    } catch (err) {}
+
+    // Never start a transition on top of another one, because that crashes Chrome.
+    // Instead, cut the running animation short and switch instantly.
+    if (transition) {
+      if (reveal) reveal.cancel();
+      transition.skipTransition();
+      applyTheme();
       return;
     }
 
-    var rect = btn.getBoundingClientRect();
+    // Moving between, for example, light and a light system doesn't change the page.
+    if (resolveTheme() === previousTheme) {
+      applyTheme();
+      return;
+    }
+
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!document.startViewTransition || reduceMotion) {
+      applyTheme();
+      return;
+    }
+
+    var rect = option.getBoundingClientRect();
     var x = rect.left + rect.width / 2;
     var y = rect.top + rect.height / 2;
     var endRadius = Math.hypot(
@@ -115,12 +169,12 @@ void main() {
       Math.max(y, window.innerHeight - y)
     );
 
-    var transition = document.startViewTransition(function() {
-      applyTheme(next);
+    transition = document.startViewTransition(function() {
+      applyTheme();
     });
 
     transition.ready.then(function() {
-      document.documentElement.animate(
+      reveal = document.documentElement.animate(
         {
           clipPath: [
             'circle(0px at ' + x + 'px ' + y + 'px)',
@@ -133,13 +187,25 @@ void main() {
           pseudoElement: '::view-transition-new(root)'
         }
       );
+    }).catch(function() {
+      // The transition was skipped.
     });
+
+    function onFinished() {
+      transition = null;
+      reveal = null;
+    }
+    transition.finished.then(onFinished, onFinished);
   });
 })();
 ''',
       ),
     ],
-    body: App(),
+    body: Component.fragment([
+      // Light is the default until the theme script, above, picks a theme.
+      const Document.html(attributes: {'data-theme': 'light', 'data-theme-choice': 'system'}),
+      App(),
+    ]),
   ));
 }
 

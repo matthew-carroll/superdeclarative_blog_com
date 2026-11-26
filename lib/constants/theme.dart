@@ -84,6 +84,9 @@ List<StyleRule> get styles => [
       '--hr-gradient': 'linear-gradient(90deg, transparent 0%, rgba(129, 140, 248, 0.55) 50%, transparent 100%)',
       '--selection-bg': 'rgba(99, 102, 241, 0.35)',
       '--selection-ink': '#FFFFFF',
+      '--toggle-track': 'rgba(255, 255, 255, 0.04)',
+      '--toggle-thumb': 'rgba(255, 255, 255, 0.12)',
+      '--toggle-thumb-shadow': 'inset 0 1px 0 rgba(255, 255, 255, 0.08)',
     },
   ),
   css('html[data-theme="light"]').styles(
@@ -114,6 +117,9 @@ List<StyleRule> get styles => [
       '--hr-gradient': 'linear-gradient(90deg, transparent 0%, rgba(79, 70, 229, 0.35) 50%, transparent 100%)',
       '--selection-bg': 'rgba(79, 70, 229, 0.18)',
       '--selection-ink': '#141416',
+      '--toggle-track': 'rgba(20, 20, 22, 0.05)',
+      '--toggle-thumb': '#FFFFFF',
+      '--toggle-thumb-shadow': '0 1px 3px rgba(20, 20, 22, 0.16)',
     },
   ),
   css('*, *::before, *::after').styles(

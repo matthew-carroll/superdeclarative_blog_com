@@ -8,15 +8,24 @@ import '../constants/theme.dart';
 class Header extends StatelessComponent {
   const Header({super.key});
 
+  static const _iconAttributes =
+      'class="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+
   static const _sunIconSvg =
-      '<svg class="theme-icon icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      '<svg $_iconAttributes>'
       '<circle cx="12" cy="12" r="4"/>'
       '<path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>'
       '<path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'
       '</svg>';
 
+  static const _monitorIconSvg =
+      '<svg $_iconAttributes>'
+      '<rect width="20" height="14" x="2" y="3" rx="2"/>'
+      '<path d="M8 21h8"/><path d="M12 17v4"/>'
+      '</svg>';
+
   static const _moonIconSvg =
-      '<svg class="theme-icon icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      '<svg $_iconAttributes>'
       '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'
       '</svg>';
 
@@ -59,14 +68,15 @@ class Header extends StatelessComponent {
               Link(to: '/about', child: .text('About')),
             ]),
           ]),
-          button(
+          // The theme script in main.server.dart keeps the selected option up to date.
+          div(
             id: 'theme-toggle',
-            type: ButtonType.button,
             classes: 'theme-toggle',
-            attributes: const {'aria-label': 'Toggle light or dark mode', 'title': 'Toggle light or dark mode'},
+            attributes: const {'role': 'radiogroup', 'aria-label': 'Color theme'},
             [
-              const RawText(_sunIconSvg),
-              const RawText(_moonIconSvg),
+              _themeOption('light', 'Light', _sunIconSvg),
+              _themeOption('system', 'System', _monitorIconSvg),
+              _themeOption('dark', 'Dark', _moonIconSvg),
             ],
           ),
           a(
@@ -78,6 +88,22 @@ class Header extends StatelessComponent {
         ]),
       ]),
     ]);
+  }
+
+  Component _themeOption(String value, String name, String iconSvg) {
+    return label(
+      classes: 'theme-option theme-option-$value',
+      attributes: {'title': name},
+      [
+        input(
+          type: InputType.radio,
+          name: 'theme',
+          value: value,
+          attributes: {'aria-label': name, 'autocomplete': 'off'},
+        ),
+        RawText(iconSvg),
+      ],
+    );
   }
 
   @css
@@ -199,24 +225,64 @@ class Header extends StatelessComponent {
           ]),
           css('.theme-toggle').styles(
             display: .inlineFlex,
+            position: .relative(),
             alignItems: .center,
-            justifyContent: .center,
-            width: 32.px,
-            height: 32.px,
-            padding: .zero,
-            backgroundColor: Colors.transparent,
-            border: Border.all(color: borderMedium, width: 1.px, style: BorderStyle.solid),
+            padding: .all(3.px),
+            border: Border.all(color: borderSubtle, width: 1.px, style: BorderStyle.solid),
             radius: .all(.circular(999.px)),
-            color: inkSecondary,
             raw: {
-              'cursor': 'pointer',
-              'transition': 'color 160ms ease, border-color 160ms ease, background-color 160ms ease',
+              '--option-size': '26px',
+              'flex-shrink': '0',
+              'background': 'var(--toggle-track)',
             },
           ),
-          css('.theme-toggle:hover').styles(
+          // The thumb that slides behind the selected option.
+          css('.theme-toggle::before').styles(
+            position: .absolute(top: 3.px, left: 3.px),
+            width: Unit.variable('--option-size'),
+            height: Unit.variable('--option-size'),
+            radius: .all(.circular(999.px)),
+            raw: {
+              'content': '""',
+              'background': 'var(--toggle-thumb)',
+              'box-shadow': 'var(--toggle-thumb-shadow)',
+              'transform': 'translateX(var(--option-size))',
+              'transition': 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+            },
+          ),
+          css('.theme-option').styles(
+            display: .inlineFlex,
+            position: .relative(),
+            alignItems: .center,
+            justifyContent: .center,
+            width: Unit.variable('--option-size'),
+            height: Unit.variable('--option-size'),
+            radius: .all(.circular(999.px)),
+            color: inkMuted,
+            raw: {
+              'cursor': 'pointer',
+              'transition': 'color 160ms ease',
+            },
+          ),
+          css('.theme-option:hover').styles(
             color: inkPrimary,
-            backgroundColor: bgElevated,
-            border: Border.all(color: borderMedium, width: 1.px, style: BorderStyle.solid),
+          ),
+          // Visually hidden, but still focusable and available to screen readers.
+          css('.theme-option input').styles(
+            position: .absolute(top: .zero, left: .zero),
+            width: 100.percent,
+            height: 100.percent,
+            margin: .zero,
+            opacity: 0,
+            raw: {
+              'cursor': 'pointer',
+            },
+          ),
+          css('.theme-option:has(input:focus-visible)').styles(
+            raw: {
+              'outline': '2px solid var(--link-blue)',
+              'outline-offset': '1px',
+            },
           ),
           css('.nav-external').styles(
             display: .none,
@@ -234,15 +300,32 @@ class Header extends StatelessComponent {
         ]),
       ]),
     ]),
-    css('.theme-toggle .icon-moon').styles(
-      display: .none,
+    // The choice is on <html>, rather than on the inputs, so that the thumb is in the
+    // right place as soon as the page paints.
+    css('html[data-theme-choice="light"] .blog-header .header-content .header-nav .theme-toggle::before').styles(
+      raw: {'transform': 'none'},
     ),
-    css('html[data-theme="light"] .theme-toggle .icon-sun').styles(
-      display: .none,
+    css('html[data-theme-choice="dark"] .blog-header .header-content .header-nav .theme-toggle::before').styles(
+      raw: {'transform': 'translateX(calc(2 * var(--option-size)))'},
     ),
-    css('html[data-theme="light"] .theme-toggle .icon-moon').styles(
-      display: .block,
+    css(
+      'html[data-theme-choice="light"] .blog-header .header-content .header-nav .theme-option-light, '
+      'html[data-theme-choice="system"] .blog-header .header-content .header-nav .theme-option-system, '
+      'html[data-theme-choice="dark"] .blog-header .header-content .header-nav .theme-option-dark',
+    ).styles(
+      color: inkPrimary,
     ),
+    css.media(MediaQuery.raw('(prefers-reduced-motion: reduce)'), [
+      css('.blog-header .header-content .header-nav .theme-toggle::before').styles(
+        raw: {'transition': 'none'},
+      ),
+    ]),
+    // The toggle can't do anything without JavaScript.
+    css.media(MediaQuery.raw('(scripting: none)'), [
+      css('.blog-header .header-content .header-nav .theme-toggle').styles(
+        display: .none,
+      ),
+    ]),
     css.media(MediaQuery.screen(maxWidth: 519.px), [
       css('.blog-header .header-content').styles(
         padding: Padding.symmetric(horizontal: 24.px, vertical: 16.px),
@@ -279,11 +362,14 @@ class Header extends StatelessComponent {
         display: .inlineBlock,
         padding: Padding.symmetric(vertical: 6.px, horizontal: 4.px),
       ),
-      css('.blog-header .theme-toggle').styles(
-        raw: {
-          'grid-column': '3',
-          'justify-self': 'end',
-        },
+      // Pin the toggle to the corner, because it doesn't fit beside the links.
+      css('.blog-header .header-content .header-nav .theme-toggle').styles(
+        position: .absolute(top: 27.px, right: 24.px),
+        raw: {'--option-size': '30px'},
+      ),
+      // Line up with the back link.
+      css('.blog-header.blog-header-post .header-content .header-nav .theme-toggle').styles(
+        position: .absolute(top: 6.px, right: 24.px),
       ),
     ]),
     css.media(MediaQuery.screen(minWidth: 760.px), [
